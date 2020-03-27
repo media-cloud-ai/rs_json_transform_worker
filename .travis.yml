@@ -10,6 +10,9 @@ rust:
   - beta
   - nightly
 
+services:
+  - "docker"
+
 matrix:
   allow_failures:
     - rust: nightly
@@ -33,23 +36,30 @@ matrix:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
 
-env:
-  jobs:
-    - JQ_LIB_DIR=/usr/bin/jq
-script:
-  - cargo test
 cache:
   cargo: true
 before_cache:
   # Travis can't cache files that are not readable by "others"
   - chmod -R a+r $HOME/.cargo
 
+jobs:
+  include:
+    - stage: "test"
+      name: "Unit Tests"
+      script: cargo test
+    - stage: "version"
+      name: "Check version"
+      script: make docker-registry-login && make check-version
+    - stage: deploy
+      name: "Deploy to docker hub"
+      script: make docker-registry-login && \
+              make docker-build && \
+              make docker-push-registry
+      if: branch = master
+
 addons:
   apt:
     packages:
       - libssl-dev      # Required for tarpaulin
-      - gcc             # Required for jq
-      - make            # Required for jq
-      - autotools-dev   # Required for jq
-      - jq              # Required for jq_rs
+      - make
     update: true
