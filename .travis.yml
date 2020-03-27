@@ -33,8 +33,6 @@ matrix:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
 
-before_install:
-  - sudo apt-get -y install gcc make autotools-dev jq
 env:
   jobs:
     - JQ_LIB_DIR=/usr/bin/jq
@@ -49,5 +47,9 @@ before_cache:
 addons:
   apt:
     packages:
-      - libssl-dev  # Required for tarpaulin
+      - libssl-dev      # Required for tarpaulin
+      - gcc             # Required for jq
+      - make            # Required for jq
+      - autotools-dev   # Required for jq
+      - jq              # Required for jq_rs
     update: true
