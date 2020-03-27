@@ -3,15 +3,6 @@ FROM rust:1.41-stretch as builder
 ADD . /src
 WORKDIR /src
 
-RUN apt-get update && \
-    apt install -y \
-        gcc \
-        make \
-        autotools-dev \
-        jq
-
-ENV JQ_LIB_DIR=/usr/bin/jq
-
 RUN cargo build --verbose --release && \
     cargo install --path .
 
@@ -24,4 +15,5 @@ RUN apt update && \
         ca-certificates
         
 ENV AMQP_QUEUE=job_json_transform
+ENV RUST_LOG=DEBUG
 CMD rs_json_transform_worker
