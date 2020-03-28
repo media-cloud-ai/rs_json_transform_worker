@@ -57,6 +57,11 @@ jobs:
               make docker-push-registry
       if: branch = master
 
+stages:
+  - version
+  - test
+  - deploy
+
 addons:
   apt:
     packages:
