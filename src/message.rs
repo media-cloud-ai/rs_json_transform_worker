@@ -27,7 +27,10 @@ pub fn process(
     filter_type => {
       let result = job_result
         .with_status(JobStatus::Error)
-        .with_message(&format!("filter_type {:?} not supported (['file', 'string']).", filter_type));
+        .with_message(&format!(
+          "filter_type {:?} not supported (['file', 'string']).",
+          filter_type
+        ));
 
       Err(MessageError::ProcessingError(result))
     }
@@ -71,14 +74,12 @@ fn filter_with_file(job: &Job, job_result: JobResult) -> Result<JobResult, Messa
   let destination_path = get_destination_path(&job)?;
 
   info!("Parse filter file name.");
-  let filter_filename = job
-    .get_string_parameter("filter")
-    .ok_or_else(|| {
-      let result = JobResult::from(job)
-        .with_status(JobStatus::Error)
-        .with_message("Destination path must be defined.");
-      MessageError::ProcessingError(result)
-    })?;
+  let filter_filename = job.get_string_parameter("filter").ok_or_else(|| {
+    let result = JobResult::from(job)
+      .with_status(JobStatus::Error)
+      .with_message("Destination path must be defined.");
+    MessageError::ProcessingError(result)
+  })?;
 
   if Path::new(&filter_filename).is_file() {
     info!("Open filter file.");
@@ -104,7 +105,7 @@ fn filter_with_file(job: &Job, job_result: JobResult) -> Result<JobResult, Messa
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_message(&format!("{:?} is not an existing file.", filter_filename));
-    return Err(MessageError::ProcessingError(result));
+    Err(MessageError::ProcessingError(result))
   }
 }
 
@@ -117,6 +118,15 @@ fn filter_source_paths(
 ) -> Result<JobResult, MessageError> {
   info!("Start filter_source_paths.");
 
+  debug!("Create output file.");
+  let output_path = Path::new(&destination_path);
+  let mut output_file = fs::File::create(&output_path).map_err(|e| {
+    let result = JobResult::from(job)
+      .with_status(JobStatus::Error)
+      .with_message(&e.to_string());
+    MessageError::ProcessingError(result)
+  })?;
+
   info!("Compile filter as a jq program");
   let mut program = jq_rs::compile(filter).map_err(|e| {
     let result = JobResult::from(job)
@@ -128,7 +138,6 @@ fn filter_source_paths(
   info!("Run jq program on each source_paths.");
   for source_path in source_paths {
     let input_path = Path::new(&source_path);
-    let output_path = Path::new(&destination_path);
 
     info!("{}", format!("Run jq program on '{}'.", source_path));
     if input_path.is_file() {
@@ -148,15 +157,7 @@ fn filter_source_paths(
         MessageError::ProcessingError(result)
       })?;
 
-      debug!("Create output file.");
-      let mut output_file = fs::File::create(&output_path).map_err(|e| {
-        let result = JobResult::from(job)
-          .with_status(JobStatus::Error)
-          .with_message(&e.to_string());
-        MessageError::ProcessingError(result)
-      })?;
-
-      debug!("Write jq program result to file.");
+      debug!("Write jq program result to output_file.");
       output_file
         .write_all(output_content.as_bytes())
         .map_err(|e| {
