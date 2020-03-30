@@ -345,7 +345,7 @@ mod tests {
     assert!(source_path_1.exists());
 
     let source_path_2 = Path::new("/tmp/source_2.json");
-    assert!(! source_path_2.exists());
+    assert!(!source_path_2.exists());
 
     let message = r#"{
       "parameters": [
@@ -382,7 +382,10 @@ mod tests {
 
     let job_result = JobResult::new(124)
       .with_status(JobStatus::Error)
-      .with_message(&format!("No such a file or directory: '{:?}'", source_path_2));
+      .with_message(&format!(
+        "No such a file or directory: '{:?}'",
+        source_path_2
+      ));
 
     assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
   }
