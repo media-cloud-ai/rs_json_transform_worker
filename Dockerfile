@@ -15,5 +15,4 @@ RUN apt update && \
         ca-certificates
         
 ENV AMQP_QUEUE=job_json_transform
-ENV RUST_LOG=DEBUG
 CMD rs_json_transform_worker

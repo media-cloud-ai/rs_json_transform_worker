@@ -24,12 +24,14 @@ impl MessageEvent for JsonTransformEvent {
   }
 
   fn get_short_description(&self) -> String {
-    "Transform json using jq".to_string()
+    "Transform json file(s) into another json based on template".to_string()
   }
 
   fn get_description(&self) -> String {
-    r#"Manipulate json files to transform into desired format
-    ."#
+    r#"This worker enables the transformation of a json into an another json.
+    The template is based on jq syntax to provide a very generic transformation tool.
+    Input can be a single file to generate one transformed file.
+    In case of multiple files is passed, a merged can be performed."#
       .to_string()
   }
 
@@ -40,14 +42,14 @@ impl MessageEvent for JsonTransformEvent {
   fn get_parameters(&self) -> Vec<Parameter> {
     vec![
       Parameter {
-        identifier: "filter".to_string(),
-        label: "Filter".to_string(),
+        identifier: "template_url".to_string(),
+        label: "Template url".to_string(),
         kind: vec![ParameterType::String],
         required: true,
       },
       Parameter {
-        identifier: "filter_type".to_string(),
-        label: "Filter type".to_string(),
+        identifier: "mode".to_string(),
+        label: "Mode".to_string(),
         kind: vec![ParameterType::String],
         required: false,
       },

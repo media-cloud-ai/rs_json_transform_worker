@@ -4,8 +4,6 @@ use amqp_worker::ParametersContainer;
 use jq_rs;
 use lapin_futures::Channel;
 use std::fs;
-use std::io::prelude::*;
-use std::io::BufReader;
 use std::path::Path;
 
 pub fn process(
@@ -15,21 +13,20 @@ pub fn process(
 ) -> Result<JobResult, MessageError> {
   info!("Start process.");
 
-  info!("Match on filter_type.");
+  info!("Match on process mode.");
   match job
-    .get_string_parameter("filter_type")
+    .get_string_parameter("mode")
     .unwrap_or_else(|| "string".to_string())
     .as_str()
   {
-    // "file"      => filter_with_file(&job, job_result),
-    "string" => filter_with_string(&job, job_result),
-    "file" => filter_with_file(&job, job_result),
-    filter_type => {
+    "string" => process_with_string(&job, job_result),
+    "file" => process_with_source_url(&job, job_result),
+    mode => {
       let result = job_result
         .with_status(JobStatus::Error)
         .with_message(&format!(
-          "filter_type {:?} not supported (['file', 'string']).",
-          filter_type
+          "Mode '{}' not supported (['file', 'string']).",
+          mode
         ));
 
       Err(MessageError::ProcessingError(result))
@@ -37,8 +34,8 @@ pub fn process(
   }
 }
 
-fn filter_with_string(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
-  info!("Start filter_with_string.");
+fn process_with_string(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+  info!("Start process_with_string.");
 
   info!("Parse source_paths.");
   let source_paths = get_source_paths(&job)?;
@@ -46,26 +43,25 @@ fn filter_with_string(job: &Job, job_result: JobResult) -> Result<JobResult, Mes
   info!("Parse destination path.");
   let destination_path = get_destination_path(&job)?;
 
-  info!("Parse filter.");
-  let filter = job.get_string_parameter("filter");
-  if filter.is_none() {
+  info!("Parse template_url.");
+  let template_content = job.get_string_parameter("template_url").ok_or_else(|| {
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_message("Filter must be defined.");
-    return Err(MessageError::ProcessingError(result));
-  }
+    MessageError::ProcessingError(result)
+  })?;
 
-  filter_source_paths(
+  process_source_paths(
     &job,
     job_result,
     &source_paths,
-    filter.unwrap().as_str(),
+    &template_content,
     &destination_path,
   )
 }
 
-fn filter_with_file(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
-  info!("Start filter_with_file.");
+fn process_with_source_url(job: &Job, job_result: JobResult) -> Result<JobResult, MessageError> {
+  info!("Start process_with_source_url.");
 
   info!("Parse source_paths.");
   let source_paths = get_source_paths(&job)?;
@@ -73,62 +69,49 @@ fn filter_with_file(job: &Job, job_result: JobResult) -> Result<JobResult, Messa
   info!("Parse destination path.");
   let destination_path = get_destination_path(&job)?;
 
-  info!("Parse filter file name.");
-  let filter_filename = job.get_string_parameter("filter").ok_or_else(|| {
+  info!("Parse template_url.");
+  let template_filename = job.get_string_parameter("template_url").ok_or_else(|| {
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_message("Destination path must be defined.");
     MessageError::ProcessingError(result)
   })?;
 
-  if Path::new(&filter_filename).is_file() {
-    info!("Open filter file.");
-    let filter_file = fs::File::open(&filter_filename).map_err(|e| {
-      let result = JobResult::from(job)
-        .with_status(JobStatus::Error)
-        .with_message(&e.to_string());
-      MessageError::ProcessingError(result)
-    })?;
-
-    info!("Read filter file content.");
-    let mut buf_reader = BufReader::new(filter_file);
-    let mut filter = String::new();
-    buf_reader.read_to_string(&mut filter).map_err(|e| {
-      let result = JobResult::from(job)
-        .with_status(JobStatus::Error)
-        .with_message(&e.to_string());
-      MessageError::ProcessingError(result)
-    })?;
-
-    filter_source_paths(&job, job_result, &source_paths, &filter, &destination_path)
-  } else {
+  if !Path::new(&template_filename).is_file() {
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
-      .with_message(&format!("{:?} is not an existing file.", filter_filename));
-    Err(MessageError::ProcessingError(result))
+      .with_message(&format!("{:?} is not an existing file.", template_filename));
+    return Err(MessageError::ProcessingError(result));
   }
-}
 
-fn filter_source_paths(
-  job: &Job,
-  job_result: JobResult,
-  source_paths: &[String],
-  filter: &str,
-  destination_path: &str,
-) -> Result<JobResult, MessageError> {
-  info!("Start filter_source_paths.");
-
-  debug!("Create output file.");
-  let output_path = Path::new(&destination_path);
-  let mut output_file = fs::File::create(&output_path).map_err(|e| {
+  info!("Read template_url.");
+  let template_content = fs::read_to_string(&template_filename).map_err(|e| {
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_message(&e.to_string());
     MessageError::ProcessingError(result)
   })?;
 
-  info!("Compile filter as a jq program");
-  let mut program = jq_rs::compile(filter).map_err(|e| {
+  process_source_paths(
+    &job,
+    job_result,
+    &source_paths,
+    &template_content,
+    &destination_path,
+  )
+}
+
+fn process_source_paths(
+  job: &Job,
+  job_result: JobResult,
+  source_paths: &[String],
+  template_content: &str,
+  destination_path: &str,
+) -> Result<JobResult, MessageError> {
+  info!("Start process_source_paths.");
+
+  info!("Compile template_content as a jq program");
+  let mut program = jq_rs::compile(template_content).map_err(|e| {
     let result = JobResult::from(job)
       .with_status(JobStatus::Error)
       .with_message(&e.to_string());
@@ -157,15 +140,13 @@ fn filter_source_paths(
         MessageError::ProcessingError(result)
       })?;
 
-      debug!("Write jq program result to output_file.");
-      output_file
-        .write_all(output_content.as_bytes())
-        .map_err(|e| {
-          let result = JobResult::from(job)
-            .with_status(JobStatus::Error)
-            .with_message(&e.to_string());
-          MessageError::ProcessingError(result)
-        })?;
+      debug!("Write jq program result to destination_path.");
+      fs::write(&destination_path, output_content).map_err(|e| {
+        let result = JobResult::from(job)
+          .with_status(JobStatus::Error)
+          .with_message(&e.to_string());
+        MessageError::ProcessingError(result)
+      })?;
     } else if input_path.is_dir() {
       let result = JobResult::from(job)
         .with_status(JobStatus::Error)
@@ -210,4 +191,230 @@ fn get_destination_path(job: &Job) -> Result<String, MessageError> {
     })?;
 
   Ok(destination_path)
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use serde_json;
+  use std::fs::File;
+  use std::io::Write;
+
+  fn init() {
+    let _ = env_logger::builder().is_test(true).try_init();
+  }
+
+  #[test]
+  fn process_with_string_test_ok() {
+    init();
+    let john = serde_json::json!({
+      "name": "John Doe",
+      "age": 43,
+      "phones": [
+          "+44 1234567",
+          "+44 2345678"
+      ]
+    });
+
+    let source_path = Path::new("/tmp/source.json");
+    let source_file = File::create(source_path).unwrap();
+    serde_json::to_writer(source_file, &john).unwrap();
+    assert!(source_path.exists());
+
+    let destination_path = Path::new("/tmp/destination.json");
+
+    let message = r#"{
+      "parameters": [
+        {
+          "id": "source_paths",
+          "type": "array_of_strings",
+          "value": [
+            "/tmp/source.json"
+          ]
+        },
+        {
+          "id": "mode",
+          "type": "string",
+          "value": "string"
+        },
+        {
+          "id": "template_url",
+          "type": "string",
+          "value": ".name"
+        },
+        {
+          "id": "destination_path",
+          "type": "string",
+          "value": "/tmp/destination.json"
+        }
+      ],
+      "job_id": 123
+    }"#;
+
+    let job = Job::new(message).unwrap();
+    let job_result = JobResult::new(job.job_id);
+    let result = process(None, &job, job_result);
+
+    assert!(result.is_ok());
+    assert!(destination_path.exists());
+    assert_eq!(
+      fs::read_to_string(&destination_path).unwrap(),
+      "\"John Doe\"\n"
+    );
+  }
+
+  #[test]
+  fn process_with_template_url_test_ok() {
+    init();
+    let john = serde_json::json!({
+      "name": "John Doe",
+      "age": 43,
+      "phones": [
+          "+44 1234567",
+          "+44 2345678"
+      ]
+    });
+
+    let source_path = Path::new("/tmp/source.json");
+    let source_file = File::create(source_path).unwrap();
+    serde_json::to_writer(source_file, &john).unwrap();
+    assert!(source_path.exists());
+
+    let template_path = Path::new("/tmp/template.jq");
+    let mut template_file = File::create(template_path).unwrap();
+    template_file.write_all(".name".as_bytes()).unwrap();
+    assert!(template_path.exists());
+
+    let destination_path = Path::new("/tmp/destination.json");
+
+    let message = r#"{
+      "parameters": [
+        {
+          "id": "source_paths",
+          "type": "array_of_strings",
+          "value": [
+            "/tmp/source.json"
+          ]
+        },
+        {
+          "id": "mode",
+          "type": "string",
+          "value": "file"
+        },
+        {
+          "id": "template_url",
+          "type": "string",
+          "value": "/tmp/template.jq"
+        },
+        {
+          "id": "destination_path",
+          "type": "string",
+          "value": "/tmp/destination.json"
+        }
+      ],
+      "job_id": 123
+    }"#;
+
+    let job = Job::new(message).unwrap();
+    let job_result = JobResult::new(job.job_id);
+    let result = process(None, &job, job_result);
+
+    assert!(result.is_ok());
+    assert!(destination_path.exists());
+    assert_eq!(
+      fs::read_to_string(&destination_path).unwrap(),
+      "\"John Doe\"\n"
+    );
+  }
+
+  #[test]
+  fn process_test_error() {
+    init();
+    let john = serde_json::json!({
+      "name": "John Doe",
+      "age": 43,
+      "phones": [
+          "+44 1234567",
+          "+44 2345678"
+      ]
+    });
+
+    let source_path_1 = Path::new("/tmp/source_1.json");
+    let source_file_1 = File::create(source_path_1).unwrap();
+    serde_json::to_writer(source_file_1, &john).unwrap();
+    assert!(source_path_1.exists());
+
+    let source_path_2 = Path::new("/tmp/source_2.json");
+    assert!(! source_path_2.exists());
+
+    let message = r#"{
+      "parameters": [
+        {
+          "id": "source_paths",
+          "type": "array_of_strings",
+          "value": [
+            "/tmp/source_1.json",
+            "/tmp/source_2.json"
+          ]
+        },
+        {
+          "id": "mode",
+          "type": "string",
+          "value": "string"
+        },
+        {
+          "id": "template_url",
+          "type": "string",
+          "value": ".name"
+        },
+        {
+          "id": "destination_path",
+          "type": "string",
+          "value": "/tmp/destination.json"
+        }
+      ],
+      "job_id": 124
+    }"#;
+
+    let job = Job::new(message).unwrap();
+    let job_result = JobResult::new(job.job_id);
+    let result = process(None, &job, job_result);
+
+    let job_result = JobResult::new(124)
+      .with_status(JobStatus::Error)
+      .with_message(&format!("No such a file or directory: '{:?}'", source_path_2));
+
+    assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
+  }
+
+  #[test]
+  fn mode_test_error() {
+    let message = r#"{
+      "parameters": [
+        {
+          "id": "source_paths",
+          "type": "array_of_strings",
+          "value": [
+            "/tmp/source.json"
+          ]
+        },
+        {
+          "id": "mode",
+          "type": "string",
+          "value": "url"
+        }
+      ],
+      "job_id": 0
+    }"#;
+
+    let job = Job::new(message).unwrap();
+    let job_result = JobResult::new(job.job_id);
+    let result = process(None, &job, job_result);
+
+    let job_result = JobResult::new(0)
+      .with_status(JobStatus::Error)
+      .with_message("Mode 'url' not supported (['file', 'string']).");
+
+    assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
+  }
 }

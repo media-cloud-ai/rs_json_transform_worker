@@ -1,4 +1,4 @@
-.PHONY: docker-build docker-clean docker-registry-login docker-push-registry test check-version
+.PHONY: docker-build docker-clean docker-registry-login docker-push-registry test check-version clippy
 
 DOCKER_REGISTRY?=
 DOCKER_IMG_NAME?=media-cloud-ai/rs_json_transform_worker
