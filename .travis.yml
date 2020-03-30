@@ -20,7 +20,9 @@ matrix:
 
   include:
     # Rustfmt
-    - rust: stable
+    - stage: format
+      name: "Format"
+      rust: stable
       install:
         - rustup component add rustfmt-preview
       before_script:
@@ -29,27 +31,24 @@ matrix:
         - cargo fmt -- --check
 
     # Clippy
-    - rust: stable
+    - stage: clippy
+      name: "Clippy"
+      rust: stable
       install:
         - rustup component add clippy-preview
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
 
-cache:
-  cargo: true
-before_cache:
-  # Travis can't cache files that are not readable by "others"
-  - chmod -R a+r $HOME/.cargo
-
-jobs:
-  include:
     - stage: "test"
       name: "Unit Tests"
+      rust: stable
       script: cargo test
-    - stage: "version"
+
+    - stage: version
       name: "Check version"
       script: make docker-registry-login && make check-version
+
     - stage: deploy
       name: "Deploy to docker hub"
       script: make docker-registry-login && \
@@ -57,8 +56,16 @@ jobs:
               make docker-push-registry
       if: branch = master
 
+cache:
+  cargo: true
+before_cache:
+  # Travis can't cache files that are not readable by "others"
+  - chmod -R a+r $HOME/.cargo
+
 stages:
   - version
+  - format
+  - clippy
   - test
   - deploy
 
