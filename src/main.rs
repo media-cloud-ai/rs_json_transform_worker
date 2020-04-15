@@ -53,6 +53,12 @@ impl MessageEvent for JsonTransformEvent {
         kind: vec![ParameterType::String],
         required: false,
       },
+      Parameter {
+        identifier: "slurp".to_string(),
+        label: "Read (slurp) all inputs into an array.".to_string(),
+        kind: vec![ParameterType::Boolean],
+        required: false,
+      },
     ]
   }
 
