@@ -462,7 +462,7 @@ mod tests {
         {
           "id": "template_url",
           "type": "string",
-          "value": ".[0] | type"
+          "value": ".[0].word + .[1].word"
         },
         {
           "id": "destination_path",
