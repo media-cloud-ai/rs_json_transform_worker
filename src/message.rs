@@ -18,10 +18,7 @@ pub fn process(
     "file" => jq_process(&job, true),
     mode => Err(Error::new(
       ErrorKind::Other,
-      format!(
-        "mode {:?} not supported.",
-        mode,
-      ),
+      format!("mode {:?} not supported.", mode,),
     )),
   };
 
@@ -269,9 +266,7 @@ mod tests {
 
     let job_result = JobResult::new(124)
       .with_status(JobStatus::Error)
-      .with_message(
-        r#"IO Error: No such file: "/tmp/source_2.json""#
-      );
+      .with_message(r#"IO Error: No such file: "/tmp/source_2.json""#);
 
     assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
   }
