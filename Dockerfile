@@ -1,4 +1,4 @@
-FROM rust:1.41-stretch as builder
+FROM rust:1.43-stretch as builder
 
 ADD . /src
 WORKDIR /src
@@ -13,6 +13,6 @@ RUN apt update && \
     apt install -y \
         libssl1.1 \
         ca-certificates
-        
+
 ENV AMQP_QUEUE=job_json_transform
 CMD rs_json_transform_worker

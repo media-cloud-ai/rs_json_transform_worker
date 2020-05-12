@@ -1,20 +1,16 @@
 [package]
 name = "rs_json_transform_worker"
 version = "0.1.0"
-authors = ["Mathia Haure-Touze <mathia.haure-touzet.ext@francetv.fr>"]
+authors = [
+  "Mathia Haure-Touze <mathia.haure-touzet.ext@francetv.fr>",
+  "Marc-Antoine Arnaud <maarnaud@media-io.com>"
+]
 edition = "2018"
 
 [dependencies]
-amqp_worker = "0.9"
-futures = "^0.1"
+mcai_worker_sdk = "0.10"
 jq-rs = {version = "0.4.1", features = ["bundled"]}
-lapin-futures = "^0.28"
-log = "^0.4"
-env_logger = "^0.7.1"
-semver = "^0.9"
-serde = "^1.0"
-serde_json = "^1.0"
-simple_logger = "1.0.1"
+jq-sys = "0.2.2"
 
 [build-dependencies]
 built = "0.4"

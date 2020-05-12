@@ -1,13 +1,9 @@
-#[macro_use]
-extern crate log;
-
-use amqp_worker::worker::{Parameter, ParameterType};
-use amqp_worker::{
+use mcai_worker_sdk::{
   job::{Job, JobResult},
-  start_worker, MessageError, MessageEvent,
+  start_worker,
+  worker::{Parameter, ParameterType},
+  McaiChannel, MessageError, MessageEvent, Version,
 };
-use lapin_futures::Channel;
-use semver::Version;
 
 mod message;
 
@@ -36,7 +32,7 @@ impl MessageEvent for JsonTransformEvent {
   }
 
   fn get_version(&self) -> Version {
-    semver::Version::parse(built_info::PKG_VERSION).expect("unable to locate Package version")
+    Version::parse(built_info::PKG_VERSION).expect("unable to locate Package version")
   }
 
   fn get_parameters(&self) -> Vec<Parameter> {
@@ -58,7 +54,7 @@ impl MessageEvent for JsonTransformEvent {
 
   fn process(
     &self,
-    channel: Option<&Channel>,
+    channel: Option<McaiChannel>,
     job: &Job,
     job_result: JobResult,
   ) -> Result<JobResult, MessageError> {
