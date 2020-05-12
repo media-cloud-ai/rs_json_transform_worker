@@ -10,7 +10,6 @@ edition = "2018"
 [dependencies]
 mcai_worker_sdk = "0.10"
 jq-rs = {version = "0.4.1", features = ["bundled"]}
-# jq-sys = "0.2.2"
 
 [build-dependencies]
 built = "0.4"
