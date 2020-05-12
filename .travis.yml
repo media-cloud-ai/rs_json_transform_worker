@@ -10,10 +10,6 @@ rust:
   - nightly
 
 matrix:
-  allow_failures:
-    - rust: nightly
-    - env: ALLOW_FAILURE=TRUE
-
   include:
     # Rustfmt
     - rust: stable
@@ -23,6 +19,8 @@ matrix:
         - cargo fmt --version
       script:
         - cargo fmt -- --check
+      env:
+        - CHECK_FORMAT=TRUE
 
     # Clippy
     - rust: stable
@@ -31,16 +29,17 @@ matrix:
       script:
         # Fail if clippy output contains "error:" or "warning:"
         - cargo clippy 2>&1 | tee ./clippy.out && ! grep -qe  "error:\|warning:" ./clippy.out
+      env:
+        - CHECK_SYNTAX=TRUE
 
-    # Test coverage (with Tarpaulin)
-    - rust: stable
-      # To avoid "Error: EPERM: operation not permitted" error (see https://github.com/valery-barysok/session-file-store/issues/58)
-      sudo: true
+    # Test coverage
+    - rust: nightly
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
-        - cargo tarpaulin -v --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
-      env: ALLOW_FAILURE=TRUE
+        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+      env:
+        - COVERAGE_CHECK=TRUE
 
 script:
   - cargo test
