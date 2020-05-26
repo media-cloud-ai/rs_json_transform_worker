@@ -42,7 +42,8 @@ matrix:
         - COVERAGE_CHECK=TRUE
 
 script:
-  - cargo test
+  # Avoid overwriting during test execution
+  - cargo test -- --test-threads=1
 
 cache:
   cargo: true
