@@ -37,7 +37,7 @@ matrix:
       install:
         - RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin --force
       script:
-        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        - cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID -- --test-threads=1
       env:
         - COVERAGE_CHECK=TRUE
 
