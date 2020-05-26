@@ -11,7 +11,6 @@ edition = "2018"
 mcai_worker_sdk = "0.10"
 jq-rs = {version = "0.4.1", features = ["bundled"]}
 jxon = "0.7.0"
-futures-util = "0.3.5"
 serde_json = "1.0.53"
 
 [build-dependencies]

@@ -293,7 +293,7 @@ mod tests {
   #[test]
   fn process_xml_to_xml_ok() {
     let content = r#"<name type="str">John Doe</name>"#;
-    
+
     fs::write("/tmp/source.xml", content).unwrap();
 
     let message = r#"{
@@ -328,10 +328,7 @@ mod tests {
 
     let destination_path = Path::new("/tmp/destination.xml");
     assert!(destination_path.exists());
-    assert_eq!(
-      fs::read_to_string(&destination_path).unwrap(),
-      content
-    );
+    assert_eq!(fs::read_to_string(&destination_path).unwrap(), content);
   }
 
   #[test]
@@ -346,7 +343,7 @@ mod tests {
         <item type="str">+44 2345678</item>
       </phones>
     </root>"#;
-    
+
     fs::write("/tmp/source.xml", content).unwrap();
 
     let message = r#"{
