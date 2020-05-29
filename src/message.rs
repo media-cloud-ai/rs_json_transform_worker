@@ -180,7 +180,7 @@ mod tests {
 
   #[test]
   fn process_with_template_file_test_ok() {
-    let message = fs::read_to_string("examples/xml_to_json.json").unwrap();
+    let message = fs::read_to_string("examples/file_template.json").unwrap();
 
     let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
