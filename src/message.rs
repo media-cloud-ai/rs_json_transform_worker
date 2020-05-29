@@ -128,10 +128,9 @@ fn read_source_content(path: &Path) -> Result<String, Error> {
         ),
       )
     })?;
-    print!("xml");
+    
     serde_json::to_string(&json)?
   } else {
-    print!("json");
     raw_content
   };
 
