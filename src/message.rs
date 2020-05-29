@@ -4,6 +4,7 @@ use mcai_worker_sdk::{debug, info, job::*, McaiChannel, MessageError, Parameters
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+use xmltree::Element;
 
 pub fn process(
   _channel: Option<McaiChannel>,
@@ -11,7 +12,7 @@ pub fn process(
   job_result: JobResult,
 ) -> Result<JobResult, MessageError> {
   let result = match job
-    .get_string_parameter("mode")
+    .get_string_parameter("template_mode")
     .unwrap_or_else(|| "string".to_string())
     .as_str()
   {
@@ -32,6 +33,9 @@ fn jq_process(job: &Job, is_source_path_template: bool) -> Result<(), Error> {
   let mut program = get_filter_program(job, is_source_path_template)?;
   let source_paths = get_source_paths(job)?;
   let destination_path = get_destination_path(job)?;
+  let output_mode = job
+    .get_string_parameter("output_mode")
+    .unwrap_or_else(|| "json".to_string());
 
   for source_path in source_paths {
     let input_path = Path::new(&source_path);
@@ -57,7 +61,8 @@ fn jq_process(job: &Job, is_source_path_template: bool) -> Result<(), Error> {
     })?;
 
     debug!("Write jq program result.");
-    write_destination_content(output_path, output_content)?;
+    print!("{}", output_mode);
+    write_destination_content(output_path, output_content, &output_mode)?;
   }
 
   Ok(())
@@ -101,82 +106,59 @@ fn get_destination_path(job: &Job) -> Result<String, Error> {
 }
 
 fn read_source_content(path: &Path) -> Result<String, Error> {
-  match path.extension() {
-    Some(x) if x == "xml" => {
-      let content = fs::read_to_string(path).map_err(|e| {
+  let raw_content = fs::read_to_string(path).map_err(|e| {
+    Error::new(
+      ErrorKind::Other,
+      format!(
+        "Unable to read file {}: {}",
+        path.to_string_lossy(),
+        e.to_string()
+      ),
+    )
+  })?;
+
+  let content =
+    if let Ok(_) = Element::parse(raw_content.as_bytes()){
+      let json = xml_to_json(&raw_content).map_err(|e| {
         Error::new(
           ErrorKind::Other,
           format!(
-            "Unable to read file {}: {}",
+            "Unable to convert input to json {}: {}",
             path.to_string_lossy(),
             e.to_string()
           ),
         )
       })?;
+      print!("xml");
+      serde_json::to_string(&json)?
+    } else {
+      print!("json");
+      raw_content
+    };
 
-      let value = xml_to_json(content.as_str()).map_err(|e| {
-        Error::new(
-          ErrorKind::Other,
-          format!("Unable to parse json from xml: {}", e.to_string()),
-        )
-      })?;
-
-      serde_json::to_string(&value).map_err(|e| {
-        Error::new(
-          ErrorKind::Other,
-          format!("Unable to serialize json: {}", e.to_string()),
-        )
-      })
-    }
-    Some(x) if x == "json" => fs::read_to_string(path).map_err(|e| {
-      Error::new(
-        ErrorKind::Other,
-        format!("Unable to read file {}: {}", path.display(), e.to_string()),
-      )
-    }),
-    Some(extension) => Err(Error::new(
-      ErrorKind::Other,
-      format!("Not supported input extension '{:?}'", extension),
-    )),
-    None => Err(Error::new(
-      ErrorKind::Other,
-      format!("Input file must have an extension: '{:?}'", path),
-    )),
-  }
+  Ok(content)
 }
 
-fn write_destination_content(path: &Path, content: &str) -> Result<(), Error> {
-  match path.extension() {
-    Some(x) if x == "xml" => {
-      let xml_content = json_to_xml(content, None).map_err(|e| {
+fn write_destination_content(path: &Path, content: &String, mode: &String) -> Result<(), Error> {
+
+  let transformed_content = 
+    if mode == "xml"{
+      json_to_xml(content, None).map_err(|e| {
         Error::new(
           ErrorKind::Other,
           format!("Unable to write xml from json: {}", e.to_string()),
         )
-      })?;
+      })?
+  } else {
+    content.to_owned()
+  };
 
-      fs::write(path, xml_content).map_err(|e| {
-        Error::new(
-          ErrorKind::Other,
-          format!("Unable to write generated result: {}", e.to_string()),
-        )
-      })
-    }
-    Some(x) if x == "json" => fs::write(path, content).map_err(|e| {
-      Error::new(
-        ErrorKind::Other,
-        format!("Unable to write generated result: {}", e.to_string()),
-      )
-    }),
-    Some(extension) => Err(Error::new(
+  fs::write(path, &transformed_content).map_err(|e| {
+    Error::new(
       ErrorKind::Other,
-      format!("Not supported output extension '{:?}'", extension),
-    )),
-    None => Err(Error::new(
-      ErrorKind::Other,
-      format!("Output file must have an extension: '{:?}'", path),
-    )),
-  }
+      format!("Unable to write generated result: {}", e.to_string()),
+    )
+  })
 }
 
 #[cfg(test)]
@@ -194,7 +176,7 @@ mod tests {
       ]
     }"#;
 
-    fs::write("/tmp/source.json", content).unwrap();
+    fs::write("/tmp/source_1.json", content).unwrap();
 
     let message = r#"{
       "parameters": [
@@ -202,7 +184,7 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.json"
+            "/tmp/source_1.json"
           ]
         },
         {
@@ -213,7 +195,7 @@ mod tests {
         {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.json"
+          "value": "/tmp/destination_1.json"
         }
       ],
       "job_id": 123
@@ -226,7 +208,7 @@ mod tests {
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination.json");
+    let destination_path = Path::new("/tmp/destination_1.json");
     assert!(destination_path.exists());
     assert_eq!(
       fs::read_to_string(&destination_path).unwrap(),
@@ -245,8 +227,8 @@ mod tests {
       ]
     }"#;
 
-    fs::write("/tmp/source.json", content).unwrap();
-    fs::write("/tmp/template.jq", ".name").unwrap();
+    fs::write("/tmp/source_2.json", content).unwrap();
+    fs::write("/tmp/template_2.jq", ".name").unwrap();
 
     let message = r#"{
       "parameters": [
@@ -254,23 +236,28 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.json"
+            "/tmp/source_2.json"
           ]
         },
         {
-          "id": "mode",
+          "id": "template_mode",
           "type": "string",
           "value": "file"
         },
         {
           "id": "template",
           "type": "string",
-          "value": "/tmp/template.jq"
+          "value": "/tmp/template_2.jq"
+        },
+        {
+          "id": "output_mode",
+          "type": "string",
+          "value": "json"
         },
         {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.json"
+          "value": "/tmp/destination_2.json"
         }
       ],
       "job_id": 123
@@ -282,7 +269,7 @@ mod tests {
 
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination.json");
+    let destination_path = Path::new("/tmp/destination_2.json");
     assert!(destination_path.exists());
     assert_eq!(
       fs::read_to_string(&destination_path).unwrap(),
@@ -294,7 +281,7 @@ mod tests {
   fn process_xml_to_xml_ok() {
     let content = r#"<name type="str">John Doe</name>"#;
 
-    fs::write("/tmp/source.xml", content).unwrap();
+    fs::write("/tmp/source_3.xml", content).unwrap();
 
     let message = r#"{
       "parameters": [
@@ -302,7 +289,7 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.xml"
+            "/tmp/source_3.xml"
           ]
         },
         {
@@ -311,9 +298,14 @@ mod tests {
           "value": "."
         },
         {
+          "id": "output_mode",
+          "type": "string",
+          "value": "xml"
+        },
+        {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.xml"
+          "value": "/tmp/destination_3.xml"
         }
       ],
       "job_id": 123
@@ -326,7 +318,7 @@ mod tests {
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination.xml");
+    let destination_path = Path::new("/tmp/destination_3.xml");
     assert!(destination_path.exists());
     assert_eq!(fs::read_to_string(&destination_path).unwrap(), content);
   }
@@ -344,7 +336,7 @@ mod tests {
       </phones>
     </root>"#;
 
-    fs::write("/tmp/source.xml", content).unwrap();
+    fs::write("/tmp/source_4.xml", content).unwrap();
 
     let message = r#"{
       "parameters": [
@@ -352,7 +344,7 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.xml"
+            "/tmp/source_4.xml"
           ]
         },
         {
@@ -361,9 +353,14 @@ mod tests {
           "value": ".root[0].name[0][\"_\"]"
         },
         {
+          "id": "output_mode",
+          "type": "string",
+          "value": "json"
+        },
+        {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.json"
+          "value": "/tmp/destination_4.json"
         }
       ],
       "job_id": 123
@@ -376,7 +373,7 @@ mod tests {
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination.json");
+    let destination_path = Path::new("/tmp/destination_4.json");
     assert!(destination_path.exists());
     assert_eq!(
       fs::read_to_string(&destination_path).unwrap(),
@@ -395,8 +392,7 @@ mod tests {
       ]
     }"#;
 
-    fs::write("/tmp/source.json", content).unwrap();
-    fs::write("/tmp/template.jq", ".name").unwrap();
+    fs::write("/tmp/source_5.json", content).unwrap();
 
     let message = r#"{
       "parameters": [
@@ -404,13 +400,8 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.json"
+            "/tmp/source_5.json"
           ]
-        },
-        {
-          "id": "mode",
-          "type": "string",
-          "value": "string"
         },
         {
           "id": "template",
@@ -418,9 +409,14 @@ mod tests {
           "value": "."
         },
         {
+          "id": "output_mode",
+          "type": "string",
+          "value": "xml"
+        },
+        {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.xml"
+          "value": "/tmp/destination_5.xml"
         }
       ],
       "job_id": 123
@@ -432,7 +428,7 @@ mod tests {
 
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination.xml");
+    let destination_path = Path::new("/tmp/destination_5.xml");
     assert!(destination_path.exists());
     assert_eq!(
       fs::read_to_string(&destination_path).unwrap(),
@@ -442,16 +438,6 @@ mod tests {
 
   #[test]
   fn process_test_error() {
-    let content = r#"{
-      "name": "John Doe",
-      "age": 43,
-      "phones": [
-          "+44 1234567",
-          "+44 2345678"
-      ]
-    }"#;
-
-    fs::write("/tmp/source_1.json", content).unwrap();
 
     let message = r#"{
       "parameters": [
@@ -459,12 +445,11 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source_1.json",
-            "/tmp/source_2.json"
+            "/tmp/wrong_source.json"
           ]
         },
         {
-          "id": "mode",
+          "id": "template_mode",
           "type": "string",
           "value": "string"
         },
@@ -476,7 +461,7 @@ mod tests {
         {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination.json"
+          "value": "/tmp/destination_6.json"
         }
       ],
       "job_id": 124
@@ -488,7 +473,7 @@ mod tests {
 
     let job_result = JobResult::new(124)
       .with_status(JobStatus::Error)
-      .with_message(r#"IO Error: No such file: "/tmp/source_2.json""#);
+      .with_message(r#"IO Error: No such file: "/tmp/wrong_source.json""#);
 
     assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
   }
@@ -501,11 +486,11 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source.json"
+            "/tmp/source_7.json"
           ]
         },
         {
-          "id": "mode",
+          "id": "template_mode",
           "type": "string",
           "value": "url"
         }
