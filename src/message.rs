@@ -117,38 +117,35 @@ fn read_source_content(path: &Path) -> Result<String, Error> {
     )
   })?;
 
-  let content =
-    if let Ok(_) = Element::parse(raw_content.as_bytes()){
-      let json = xml_to_json(&raw_content).map_err(|e| {
-        Error::new(
-          ErrorKind::Other,
-          format!(
-            "Unable to convert input to json {}: {}",
-            path.to_string_lossy(),
-            e.to_string()
-          ),
-        )
-      })?;
-      print!("xml");
-      serde_json::to_string(&json)?
-    } else {
-      print!("json");
-      raw_content
-    };
+  let content = if Element::parse(raw_content.as_bytes()).is_ok() {
+    let json = xml_to_json(&raw_content).map_err(|e| {
+      Error::new(
+        ErrorKind::Other,
+        format!(
+          "Unable to convert input to json {}: {}",
+          path.to_string_lossy(),
+          e.to_string()
+        ),
+      )
+    })?;
+    print!("xml");
+    serde_json::to_string(&json)?
+  } else {
+    print!("json");
+    raw_content
+  };
 
   Ok(content)
 }
 
-fn write_destination_content(path: &Path, content: &String, mode: &String) -> Result<(), Error> {
-
-  let transformed_content = 
-    if mode == "xml"{
-      json_to_xml(content, None).map_err(|e| {
-        Error::new(
-          ErrorKind::Other,
-          format!("Unable to write xml from json: {}", e.to_string()),
-        )
-      })?
+fn write_destination_content(path: &Path, content: &str, mode: &str) -> Result<(), Error> {
+  let transformed_content = if mode == "xml" {
+    json_to_xml(content, None).map_err(|e| {
+      Error::new(
+        ErrorKind::Other,
+        format!("Unable to write xml from json: {}", e.to_string()),
+      )
+    })?
   } else {
     content.to_owned()
   };
@@ -438,7 +435,6 @@ mod tests {
 
   #[test]
   fn process_test_error() {
-
     let message = r#"{
       "parameters": [
         {
