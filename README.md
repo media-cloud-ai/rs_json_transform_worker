@@ -6,6 +6,16 @@ Transform Json to Json using template (based on jq tool)
 * jq 1.5 transformations
 * conversions between xml and json
 
+## Examples
+
+All orders in the `examples` directory can be run without any other service.
+In a terminal just to:
+```bash
+RUST_LOG=debug SOURCE_ORDERS=examples/xml_to_xml.json cargo run
+```
+
+More information can be found [here](https://docs.rs/mcai_worker_sdk/0.10.3/mcai_worker_sdk/#start-worker-locally)
+
 ## Warning
 
 Usage of xml conversions is not straightforward, the json transformation must respect the [jxon conventions](https://github.com/definitelynobody/jxon).

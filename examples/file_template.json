@@ -1,0 +1,32 @@
+{
+  "parameters": [
+    {
+      "id": "source_paths",
+      "type": "array_of_strings",
+      "value": [
+        "tests/source_1.json"
+      ]
+    },
+    {
+      "id": "template_mode",
+      "type": "string",
+      "value": "file"
+    },
+    {
+      "id": "template",
+      "type": "string",
+      "value": "tests/template_1.jq"
+    },
+    {
+      "id": "output_mode",
+      "type": "string",
+      "value": "json"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "value": "tests/destination_2.json"
+    }
+  ],
+  "job_id": 123
+}

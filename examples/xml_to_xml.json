@@ -1,0 +1,27 @@
+{
+  "parameters": [
+    {
+      "id": "source_paths",
+      "type": "array_of_strings",
+      "value": [
+        "tests/source_3.xml"
+      ]
+    },
+    {
+      "id": "template",
+      "type": "string",
+      "value": "."
+    },
+    {
+      "id": "output_mode",
+      "type": "string",
+      "value": "xml"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "value": "tests/destination_3.xml"
+    }
+  ],
+  "job_id": 123
+}

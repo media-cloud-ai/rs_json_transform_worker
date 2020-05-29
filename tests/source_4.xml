@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+  <name type="str">John Doe</name>
+  <age type="int">43</age>
+  <phones type="list">
+    <item type="str">+44 1234567</item>
+    <item type="str">+44 2345678</item>
+  </phones>
+</root>

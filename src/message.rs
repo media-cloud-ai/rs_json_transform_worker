@@ -61,7 +61,7 @@ fn jq_process(job: &Job, is_source_path_template: bool) -> Result<(), Error> {
     })?;
 
     debug!("Write jq program result.");
-    print!("{}", output_mode);
+    info!("{}", output_mode);
     write_destination_content(output_path, output_content, &output_mode)?;
   }
 
@@ -163,271 +163,83 @@ mod tests {
 
   #[test]
   fn process_with_string_test_ok() {
-    let content = r#"{
-      "name": "John Doe",
-      "age": 43,
-      "phones": [
-          "+44 1234567",
-          "+44 2345678"
-      ]
-    }"#;
+    let message = fs::read_to_string("examples/json_mapping.json").unwrap();
 
-    fs::write("/tmp/source_1.json", content).unwrap();
-
-    let message = r#"{
-      "parameters": [
-        {
-          "id": "source_paths",
-          "type": "array_of_strings",
-          "value": [
-            "/tmp/source_1.json"
-          ]
-        },
-        {
-          "id": "template",
-          "type": "string",
-          "value": ".name"
-        },
-        {
-          "id": "destination_path",
-          "type": "string",
-          "value": "/tmp/destination_1.json"
-        }
-      ],
-      "job_id": 123
-    }"#;
-
-    let job = Job::new(message).unwrap();
+    let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
     let result = process(None, &job, job_result);
 
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination_1.json");
-    assert!(destination_path.exists());
     assert_eq!(
-      fs::read_to_string(&destination_path).unwrap(),
+      fs::read_to_string("tests/destination_1.json").unwrap(),
       "\"John Doe\"\n"
     );
   }
 
   #[test]
-  fn process_with_template_url_test_ok() {
-    let content = r#"{
-      "name": "John Doe",
-      "age": 43,
-      "phones": [
-          "+44 1234567",
-          "+44 2345678"
-      ]
-    }"#;
+  fn process_with_template_file_test_ok() {
+    let message = fs::read_to_string("examples/xml_to_json.json").unwrap();
 
-    fs::write("/tmp/source_2.json", content).unwrap();
-    fs::write("/tmp/template_2.jq", ".name").unwrap();
-
-    let message = r#"{
-      "parameters": [
-        {
-          "id": "source_paths",
-          "type": "array_of_strings",
-          "value": [
-            "/tmp/source_2.json"
-          ]
-        },
-        {
-          "id": "template_mode",
-          "type": "string",
-          "value": "file"
-        },
-        {
-          "id": "template",
-          "type": "string",
-          "value": "/tmp/template_2.jq"
-        },
-        {
-          "id": "output_mode",
-          "type": "string",
-          "value": "json"
-        },
-        {
-          "id": "destination_path",
-          "type": "string",
-          "value": "/tmp/destination_2.json"
-        }
-      ],
-      "job_id": 123
-    }"#;
-
-    let job = Job::new(message).unwrap();
+    let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
     let result = process(None, &job, job_result);
 
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination_2.json");
-    assert!(destination_path.exists());
     assert_eq!(
-      fs::read_to_string(&destination_path).unwrap(),
+      fs::read_to_string("tests/destination_2.json").unwrap(),
       "\"John Doe\"\n"
     );
   }
 
   #[test]
   fn process_xml_to_xml_ok() {
-    let content = r#"<name type="str">John Doe</name>"#;
+    let message = fs::read_to_string("examples/xml_to_xml.json").unwrap();
 
-    fs::write("/tmp/source_3.xml", content).unwrap();
-
-    let message = r#"{
-      "parameters": [
-        {
-          "id": "source_paths",
-          "type": "array_of_strings",
-          "value": [
-            "/tmp/source_3.xml"
-          ]
-        },
-        {
-          "id": "template",
-          "type": "string",
-          "value": "."
-        },
-        {
-          "id": "output_mode",
-          "type": "string",
-          "value": "xml"
-        },
-        {
-          "id": "destination_path",
-          "type": "string",
-          "value": "/tmp/destination_3.xml"
-        }
-      ],
-      "job_id": 123
-    }"#;
-
-    let job = Job::new(message).unwrap();
+    let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
     let result = process(None, &job, job_result);
 
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination_3.xml");
-    assert!(destination_path.exists());
-    assert_eq!(fs::read_to_string(&destination_path).unwrap(), content);
+    assert_eq!(
+      fs::read_to_string("tests/destination_3.xml").unwrap(),
+      fs::read_to_string("tests/source_3.xml").unwrap()
+    );
   }
 
   #[test]
   fn process_xml_to_json_ok() {
-    let content = r#"
-    <?xml version="1.0" encoding="UTF-8" ?>
-    <root>
-      <name type="str">John Doe</name>
-      <age type="int">43</age>
-      <phones type="list">
-        <item type="str">+44 1234567</item>
-        <item type="str">+44 2345678</item>
-      </phones>
-    </root>"#;
+    let message = fs::read_to_string("examples/xml_to_json.json").unwrap();
 
-    fs::write("/tmp/source_4.xml", content).unwrap();
-
-    let message = r#"{
-      "parameters": [
-        {
-          "id": "source_paths",
-          "type": "array_of_strings",
-          "value": [
-            "/tmp/source_4.xml"
-          ]
-        },
-        {
-          "id": "template",
-          "type": "string",
-          "value": ".root[0].name[0][\"_\"]"
-        },
-        {
-          "id": "output_mode",
-          "type": "string",
-          "value": "json"
-        },
-        {
-          "id": "destination_path",
-          "type": "string",
-          "value": "/tmp/destination_4.json"
-        }
-      ],
-      "job_id": 123
-    }"#;
-
-    let job = Job::new(message).unwrap();
+    let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
     let result = process(None, &job, job_result);
 
     println!("{:?}", result);
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination_4.json");
-    assert!(destination_path.exists());
     assert_eq!(
-      fs::read_to_string(&destination_path).unwrap(),
+      fs::read_to_string("tests/destination_4.json").unwrap(),
       "\"John Doe\"\n"
     );
   }
 
   #[test]
   fn process_json_to_xml_ok() {
-    let content = r#"{
-      "name": [
-        {
-          "_": "John Doe", 
-          "$type": "str"
-        }
-      ]
-    }"#;
+    let message = fs::read_to_string("examples/json_to_xml.json").unwrap();
 
-    fs::write("/tmp/source_5.json", content).unwrap();
-
-    let message = r#"{
-      "parameters": [
-        {
-          "id": "source_paths",
-          "type": "array_of_strings",
-          "value": [
-            "/tmp/source_5.json"
-          ]
-        },
-        {
-          "id": "template",
-          "type": "string",
-          "value": "."
-        },
-        {
-          "id": "output_mode",
-          "type": "string",
-          "value": "xml"
-        },
-        {
-          "id": "destination_path",
-          "type": "string",
-          "value": "/tmp/destination_5.xml"
-        }
-      ],
-      "job_id": 123
-    }"#;
-
-    let job = Job::new(message).unwrap();
+    let job = Job::new(&message).unwrap();
     let job_result = JobResult::new(job.job_id);
     let result = process(None, &job, job_result);
 
     assert!(result.is_ok());
 
-    let destination_path = Path::new("/tmp/destination_5.xml");
-    assert!(destination_path.exists());
     assert_eq!(
-      fs::read_to_string(&destination_path).unwrap(),
+      fs::read_to_string("tests/destination_5.xml").unwrap(),
       r#"<name type="str">John Doe</name>"#
     );
   }
@@ -440,7 +252,7 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/wrong_source.json"
+            "tests/missing_source.json"
           ]
         },
         {
@@ -456,7 +268,7 @@ mod tests {
         {
           "id": "destination_path",
           "type": "string",
-          "value": "/tmp/destination_6.json"
+          "value": "tests/destination_6.json"
         }
       ],
       "job_id": 124
@@ -468,7 +280,7 @@ mod tests {
 
     let job_result = JobResult::new(124)
       .with_status(JobStatus::Error)
-      .with_message(r#"IO Error: No such file: "/tmp/wrong_source.json""#);
+      .with_message(r#"IO Error: No such file: "tests/missing_source.json""#);
 
     assert_eq!(result, Err(MessageError::ProcessingError(job_result)));
   }
@@ -481,7 +293,7 @@ mod tests {
           "id": "source_paths",
           "type": "array_of_strings",
           "value": [
-            "/tmp/source_7.json"
+            "tests/source_7.json"
           ]
         },
         {
