@@ -128,7 +128,7 @@ fn read_source_content(path: &Path) -> Result<String, Error> {
         ),
       )
     })?;
-    
+
     serde_json::to_string(&json)?
   } else {
     raw_content
