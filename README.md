@@ -14,4 +14,6 @@ Examples:
 
 | xml | json |
 | :-: | :-: |
+| `<?xml version="1.0" encoding="UTF-8"?>` | `{"#": {"version": "1.0", "encoding": "UTF-8"}}` |
+| `<root Something="value"/>` | `{"root":[{"$Something": "value"}]}` |
 | `<name type="str">John Doe</name>` | `{"name":[{"_": "John Doe","$type": "str"}]}`|

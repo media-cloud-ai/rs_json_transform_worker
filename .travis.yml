@@ -39,7 +39,6 @@ matrix:
         - COVERAGE_CHECK=TRUE
 
 script:
-  # Avoid overwriting during test execution
   - cargo test
 
 cache:
