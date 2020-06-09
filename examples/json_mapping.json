@@ -1,0 +1,22 @@
+{
+  "parameters": [
+    {
+      "id": "source_paths",
+      "type": "array_of_strings",
+      "value": [
+        "tests/source_1.json"
+      ]
+    },
+    {
+      "id": "template",
+      "type": "string",
+      "value": ".name"
+    },
+    {
+      "id": "destination_path",
+      "type": "string",
+      "value": "tests/destination_1.json"
+    }
+  ],
+  "job_id": 123
+}
