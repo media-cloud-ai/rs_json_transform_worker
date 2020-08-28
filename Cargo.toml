@@ -8,7 +8,7 @@ authors = [
 edition = "2018"
 
 [dependencies]
-mcai_worker_sdk = "0.10"
+mcai_worker_sdk = "0.11"
 jq-rs = {version = "0.4.1", features = ["bundled"]}
 jxon = "0.7.0"
 serde_json = "1.0.53"
